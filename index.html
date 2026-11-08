@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#173b70">
+<meta name="description" content="A simple 75-ball Bingo caller and number checklist.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>Bingo Together</title>
+<style>
+:root{color-scheme:light dark;--bg:#f4f6fb;--card:#fff;--ink:#17243b;--muted:#64748b;--line:#dce3ee;--blue:#173b70;--soft:#e7effb;--green:#157347}
+@media(prefers-color-scheme:dark){:root{--bg:#101827;--card:#1b293c;--ink:#edf3fc;--muted:#aab8cc;--line:#34445b;--blue:#8db9ff;--soft:#263d5e;--green:#73d6a2}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:650px;margin:auto;padding:18px 14px 36px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}.top h1{font-size:24px;margin:0}.sub,.muted{color:var(--muted);font-size:13px}
+.pill{background:var(--soft);padding:7px 11px;border-radius:30px;font-size:13px;font-weight:700}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;margin-bottom:14px}
+.caller{text-align:center}.eyebrow{font-size:12px;letter-spacing:1.2px;color:var(--muted);font-weight:800}
+.ball{width:150px;height:150px;border-radius:50%;margin:12px auto;display:grid;place-items:center;background:var(--soft);border:6px solid var(--blue);font-size:43px;font-weight:900;color:var(--ink)}
+.status{font-size:13px;color:var(--muted);min-height:20px}
+.actions{display:flex;gap:9px;margin-top:14px}.btn{border:0;border-radius:12px;padding:13px 16px;font:700 15px system-ui;cursor:pointer;flex:1;background:var(--soft);color:var(--ink)}.btn.primary{background:var(--blue);color:white}.btn:disabled{opacity:.4}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:17px}.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center}.stat strong{display:block;font-size:23px}.stat span{font-size:12px;color:var(--muted)}
+.section-head{display:flex;justify-content:space-between;align-items:center;margin:20px 2px 8px}.section-head h2{font-size:17px;margin:0}
+.board{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}.column-title{text-align:center;font-size:18px;font-weight:900;padding:6px}.number{aspect-ratio:1;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-size:clamp(12px,3.5vw,16px);font-weight:700;display:grid;place-items:center}.number.called{background:var(--soft);border:2px solid var(--green);color:var(--green)}.number.current{outline:3px solid var(--blue);outline-offset:1px}
+.history{display:flex;flex-wrap:wrap;gap:7px;min-height:25px}.history span{background:var(--soft);padding:6px 9px;border-radius:20px;font-size:13px;font-weight:700}
+footer{text-align:center;color:var(--muted);font-size:12px;margin-top:16px}
+@media(max-width:380px){main{padding:13px 10px}.panel{padding:15px}.ball{width:130px;height:130px}.actions .btn{padding:12px 8px;font-size:13px}}
+</style>
+</head>
+<body><main>
+<header class="top"><div><h1>🎱 Bingo Together</h1><div class="sub">75-ball Bingo caller</div></div><div class="pill" id="progress">0 / 75 called</div></header>
+<section class="panel caller"><div class="eyebrow">CURRENT NUMBER</div><div class="ball" id="current" aria-live="polite">--</div><div class="status" id="status">Ready to play! Tap Call Number.</div><div class="actions"><button class="btn primary" id="call">🎲 Call Number</button><button class="btn" id="undo" disabled>↶ Undo</button></div><button class="btn" id="reset" style="margin-top:9px;width:100%">Reset Game</button></section>
+<div class="stats"><div class="stat"><strong id="count">0</strong><span>Called</span></div><div class="stat"><strong id="remaining">75</strong><span>Remaining</span></div><div class="stat"><strong id="percent">0%</strong><span>Completed</span></div></div>
+<div class="section-head"><h2>Number Checklist</h2><span class="muted">✓ = called</span></div><section class="board" id="board" aria-label="Bingo number checklist"></section>
+<div class="section-head"><h2>Called Numbers History</h2><span class="muted">Newest first</span></div><section class="panel"><div class="history" id="history">No numbers called yet.</div></section>
+<footer>B 1–15 · I 16–30 · N 31–45 · G 46–60 · O 61–75<br>Game progress is saved on this device.</footer>
+</main>
+<script>
+(()=>{
+const letters=['B','I','N','G','O'],all=Array.from({length:75},(_,i)=>i+1);
+const $=id=>document.getElementById(id);let called=[];
+try{called=JSON.parse(localStorage.getItem('bingo-together-called')||'[]');if(!Array.isArray(called)||called.some(n=>!Number.isInteger(n)||n<1||n>75))called=[];}catch{called=[];}
+const letter=n=>letters[Math.floor((n-1)/15)];
+function render(){
+ const last=called.at(-1),used=new Set(called),remaining=75-called.length;
+ $('current').textContent=last?letter(last)+'-'+last:'--';
+ $('status').textContent=last?'Last called: '+letter(last)+'-'+last:(remaining?'Ready to play! Tap Call Number.':'All numbers called!');
+ $('count').textContent=called.length;$('remaining').textContent=remaining;
+ $('percent').textContent=Math.round(called.length/75*100)+'%';$('progress').textContent=called.length+' / 75 called';
+ $('undo').disabled=!called.length;$('call').disabled=!remaining;
+ $('board').innerHTML=letters.map((l,c)=>'<div><div class="column-title">'+l+'</div>'+all.filter(n=>Math.floor((n-1)/15)===c).map(n=>'<div class="number '+(used.has(n)?'called ':'')+(n===last?'current':'')+'" aria-label="'+l+' '+n+(used.has(n)?', called':'')+'">'+n+(used.has(n)?' ✓':'')+'</div>').join('')+'</div>').join('');
+ $('history').innerHTML=called.length?[...called].reverse().map(n=>'<span>'+letter(n)+'-'+n+'</span>').join(''):'No numbers called yet.';
+ localStorage.setItem('bingo-together-called',JSON.stringify(called));
+}
+$('call').addEventListener('click',()=>{const remaining=all.filter(n=>!called.includes(n));if(!remaining.length)return;called.push(remaining[Math.floor(Math.random()*remaining.length)]);render();});
+$('undo').addEventListener('click',()=>{called.pop();render();});
+$('reset').addEventListener('click',()=>{if(!called.length||confirm('Start a new game? This clears the called numbers.')){called=[];render();}});
+render();
+if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+})();
+</script></body></html>

@@ -31,6 +31,19 @@ footer{text-align:center;color:var(--muted);font-size:12px;margin-top:16px}
 <body><main>
 <header class="top"><div><h1>🎱 Bingo Together</h1><div class="sub">75-ball Bingo caller</div></div><div class="pill" id="progress">0 / 75 called</div></header>
 <section class="panel caller"><div class="eyebrow">CURRENT NUMBER</div><div class="ball" id="current" aria-live="polite">--</div><div class="status" id="status">Ready to play! Tap Call Number.</div><div class="actions"><button class="btn primary" id="call">🎲 Call Number</button><button class="btn" id="undo" disabled>↶ Undo</button></div><button class="btn" id="reset" style="margin-top:9px;width:100%">Reset Game</button></section>
+<section class="panel" aria-label="Caller settings">
+  <div style="font-weight:800;margin-bottom:10px">Caller Settings</div>
+  <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0">
+    <span><strong>🔔 Sound effects</strong><br><span class="muted">Play a short chime for each draw</span></span>
+    <input id="sound-toggle" type="checkbox" checked style="width:22px;height:22px;accent-color:var(--blue)">
+  </label>
+  <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0">
+    <span><strong>🗣️ Voice announcement</strong><br><span class="muted">Speak the letter and number aloud</span></span>
+    <input id="voice-toggle" type="checkbox" checked style="width:22px;height:22px;accent-color:var(--blue)">
+  </label>
+  <div class="muted" id="voice-note" style="margin-top:6px">Voice uses your phone's built-in text-to-speech.</div>
+  <button class="btn" id="test-voice" style="width:100%;margin-top:10px">▶ Test voice & sound</button>
+</section>
 <div class="stats"><div class="stat"><strong id="count">0</strong><span>Called</span></div><div class="stat"><strong id="remaining">75</strong><span>Remaining</span></div><div class="stat"><strong id="percent">0%</strong><span>Completed</span></div></div>
 <div class="section-head"><h2>Number Checklist</h2><span class="muted">✓ = called</span></div><section class="board" id="board" aria-label="Bingo number checklist"></section>
 <div class="section-head"><h2>Called Numbers History</h2><span class="muted">Newest first</span></div><section class="panel"><div class="history" id="history">No numbers called yet.</div></section>
@@ -42,6 +55,27 @@ const letters=['B','I','N','G','O'],all=Array.from({length:75},(_,i)=>i+1);
 const $=id=>document.getElementById(id);let called=[];
 try{called=JSON.parse(localStorage.getItem('bingo-together-called')||'[]');if(!Array.isArray(called)||called.some(n=>!Number.isInteger(n)||n<1||n>75))called=[];}catch{called=[];}
 const letter=n=>letters[Math.floor((n-1)/15)];
+let soundOn=localStorage.getItem('bingo-together-sound')!=='false';
+let voiceOn=localStorage.getItem('bingo-together-voice')!=='false';
+$('sound-toggle').checked=soundOn;$('voice-toggle').checked=voiceOn;
+function playChime(){
+ if(!soundOn)return;
+ try{
+  const AudioCtx=window.AudioContext||window.webkitAudioContext;if(!AudioCtx)return;
+  const ctx=new AudioCtx(),now=ctx.currentTime;
+  [660,880].forEach((freq,i)=>{const osc=ctx.createOscillator(),gain=ctx.createGain();osc.type='sine';osc.frequency.value=freq;gain.gain.setValueAtTime(.0001,now+i*.12);gain.gain.exponentialRampToValueAtTime(.16,now+i*.12+.025);gain.gain.exponentialRampToValueAtTime(.0001,now+i*.12+.22);osc.connect(gain);gain.connect(ctx.destination);osc.start(now+i*.12);osc.stop(now+i*.12+.24);});
+  setTimeout(()=>ctx.close().catch(()=>{}),650);
+ }catch(e){}
+}
+function announce(n){
+ if(!voiceOn)return;
+ if(!('speechSynthesis'in window)){ $('voice-note').textContent='Voice announcements are not supported by this browser.';return; }
+ window.speechSynthesis.cancel();
+ const utterance=new SpeechSynthesisUtterance(letter(n)+' '+n);
+ utterance.lang='en-US';utterance.rate=.88;utterance.pitch=1;utterance.volume=1;
+ window.speechSynthesis.speak(utterance);
+}
+function callEffects(n){playChime();announce(n);}
 function render(){
  const last=called.at(-1),used=new Set(called),remaining=75-called.length;
  $('current').textContent=last?letter(last)+'-'+last:'--';
@@ -53,9 +87,12 @@ function render(){
  $('history').innerHTML=called.length?[...called].reverse().map(n=>'<span>'+letter(n)+'-'+n+'</span>').join(''):'No numbers called yet.';
  localStorage.setItem('bingo-together-called',JSON.stringify(called));
 }
-$('call').addEventListener('click',()=>{const remaining=all.filter(n=>!called.includes(n));if(!remaining.length)return;called.push(remaining[Math.floor(Math.random()*remaining.length)]);render();});
+$('call').addEventListener('click',()=>{const remaining=all.filter(n=>!called.includes(n));if(!remaining.length)return;const n=remaining[Math.floor(Math.random()*remaining.length)];called.push(n);render();callEffects(n);});
 $('undo').addEventListener('click',()=>{called.pop();render();});
-$('reset').addEventListener('click',()=>{if(!called.length||confirm('Start a new game? This clears the called numbers.')){called=[];render();}});
+$('reset').addEventListener('click',()=>{if(!called.length||confirm('Start a new game? This clears the called numbers.')){if('speechSynthesis'in window)window.speechSynthesis.cancel();called=[];render();}});
+$('sound-toggle').addEventListener('change',e=>{soundOn=e.target.checked;localStorage.setItem('bingo-together-sound',String(soundOn));if(soundOn)playChime();});
+$('voice-toggle').addEventListener('change',e=>{voiceOn=e.target.checked;localStorage.setItem('bingo-together-voice',String(voiceOn));if(!voiceOn&&'speechSynthesis'in window)window.speechSynthesis.cancel();});
+$('test-voice').addEventListener('click',()=>{playChime();if(voiceOn){if('speechSynthesis'in window){window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance('Bingo Together. B twelve. I twenty four. N thirty five. G fifty two. O sixty eight.');u.lang='en-US';u.rate=.88;window.speechSynthesis.speak(u);}else $('voice-note').textContent='Voice announcements are not supported by this browser.';}});
 render();
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 })();
